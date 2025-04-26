@@ -9,7 +9,7 @@ import (
 	"os/exec"
 )
 
-//it`s really work?
+//it`s really work!
 func main() {
 	reposRoot := os.Getenv("GIT_PROJECT_ROOT")
 	if reposRoot == "" {
@@ -26,7 +26,7 @@ func main() {
 		Path: gitPath,
 		Args: []string{"http-backend"},
 		Env: []string{
-			fmt.Sprintf("GIT_PROJECT_ROOT=%s", reposRoot),
+			fmt.Sprintf("=%s", reposRoot),
 			"GIT_HTTP_EXPORT_ALL=true",
 		},
 	}
