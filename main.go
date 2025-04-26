@@ -29,6 +29,8 @@ func main() {
 			fmt.Sprintf("=%s", reposRoot),
 			"GIT_HTTP_EXPORT_ALL=true",
 		},
+		Stderr: os.Stderr,
+		Logger: log.New(os.Stdout, "INFO", 0),
 	}
 
 	log.Fatal(http.ListenAndServe("0.0.0.0:8080", gitHandler))
