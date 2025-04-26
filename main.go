@@ -9,6 +9,7 @@ import (
 	"os/exec"
 )
 
+//it`s really work?
 func main() {
 	reposRoot := os.Getenv("GIT_PROJECT_ROOT")
 	if reposRoot == "" {
