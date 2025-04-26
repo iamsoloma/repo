@@ -9,7 +9,7 @@ import (
 	"os/exec"
 )
 
-//it`s really work!
+//Stop, it`s go or git server?
 func main() {
 	reposRoot := os.Getenv("GIT_PROJECT_ROOT")
 	if reposRoot == "" {
