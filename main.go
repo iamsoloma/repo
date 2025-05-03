@@ -1,38 +1,12 @@
 package main
 
-import (
-	"fmt"
-	"log"
-	"net/http"
-	"net/http/cgi"
-	"os"
-	"os/exec"
-)
+import "repo/api"
 
-//Stop, it`s go or git server?
 func main() {
-	reposRoot := os.Getenv("GIT_PROJECT_ROOT")
-	if reposRoot == "" {
-		log.Fatal("GIT_PROJECT_ROOT env variable is not set")
+	config := api.Config{
+		ListenAddr:  "0.0.0.0:3000",
+		ReposFolder: "./repos",
 	}
-
-	gitPath, err := exec.LookPath("git")
-	if err != nil {
-		log.Fatalf("cannot find git: %v", err)
-	}
-	log.Printf("using a git at: %q", gitPath)
-
-	gitHandler := &cgi.Handler{
-		Path: gitPath,
-		Args: []string{"http-backend"},
-		Env: []string{
-			fmt.Sprintf("=%s", reposRoot),
-			"GIT_HTTP_EXPORT_ALL=true",
-		},
-		Stderr: os.Stderr,
-		Logger: log.New(os.Stdout, "INFO", 0),
-	}
-
-	log.Fatal(http.ListenAndServe("0.0.0.0:8080", gitHandler))
-
+	server := api.NewServer(config)
+	server.Start()
 }
