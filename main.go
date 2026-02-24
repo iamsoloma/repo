@@ -4,18 +4,18 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/sosedoff/gitkit"
+	"repo/git"
 )
 
 func main() {
 	// Configure git hooks
-	hooks := &gitkit.HookScripts{
-		PreReceive: `echo "Hello World!"`,
+	hooks := &git.HookScripts{
+		PreReceive:  `echo "Hello World!"`,
 		PostReceive: `echo "Hello World!" > file.txt`,
 	}
 
 	// Configure git service
-	service := gitkit.New(gitkit.Config{
+	service := git.New(git.Config{
 		Dir:        "./repos",
 		AutoCreate: true,
 		AutoHooks:  true,
@@ -23,7 +23,7 @@ func main() {
 		Hooks:      hooks,
 	})
 
-	service.AuthFunc = func(c gitkit.Credential, r *gitkit.Request) (bool, error) {
+	service.AuthFunc = func(c git.Credential, r *git.Request) (bool, error) {
 		log.Println("Auth: ", c.Username, c.Password, r.RepoName)
 		return c.Username == "soloma", nil
 	}
