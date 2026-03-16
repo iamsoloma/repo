@@ -200,6 +200,7 @@ func LoginPOST(w http.ResponseWriter, r *http.Request) {
 
         u, err := db.AuthenticateUser(username, password)
         if err != nil || u == nil {
+                log.Printf("LOGIN FAIL: username=%q err=%v", username, err)
                 render(w, "login.html", PageData{
                         Error: "Invalid username or password.",
                         Data:  map[string]string{"Username": username},
@@ -209,10 +210,12 @@ func LoginPOST(w http.ResponseWriter, r *http.Request) {
 
         token, err := db.CreateSession(u.ID)
         if err != nil {
+                log.Printf("LOGIN SESSION CREATE FAIL: user=%q err=%v", username, err)
                 render(w, "login.html", PageData{Error: "Login failed. Please try again."})
                 return
         }
 
+        log.Printf("LOGIN OK: username=%q token=%s…", username, token[:8])
         setSession(w, token)
         http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
@@ -244,8 +247,15 @@ func Home(w http.ResponseWriter, r *http.Request) {
 // ─── Dashboard ─────────────────────────────────────────────────────────────
 
 func Dashboard(w http.ResponseWriter, r *http.Request) {
+        c, cookieErr := r.Cookie(sessionCookie)
+        if cookieErr != nil {
+                log.Printf("DASHBOARD: no session cookie (%v)", cookieErr)
+        } else {
+                log.Printf("DASHBOARD: got cookie token=%s…", c.Value[:8])
+        }
         u := CurrentUser(r)
         if u == nil {
+                log.Printf("DASHBOARD: session not found, redirecting to /login")
                 http.Redirect(w, r, "/login", http.StatusFound)
                 return
         }
