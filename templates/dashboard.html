@@ -1,0 +1,53 @@
+{{template "layout" .}}
+{{define "title"}}Dashboard — GitBox{{end}}
+{{define "content"}}
+<div class="container">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Your repositories</div>
+      <div class="page-subtitle">All repositories you own</div>
+    </div>
+    <a href="/new" class="btn btn-primary">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
+      New repository
+    </a>
+  </div>
+
+  {{if .Flash}}<div class="alert alert-success">{{.Flash}}</div>{{end}}
+
+  <div class="card">
+    {{if .Data}}
+    <div class="repo-list">
+      {{range .Data}}
+      <div class="repo-item">
+        <div class="repo-item-main">
+          <a href="/{{.OwnerName}}/{{.Name}}" class="repo-name">{{.Name}}</a>
+          {{if .Description}}<div class="repo-desc">{{.Description}}</div>{{end}}
+          <div class="repo-meta">
+            {{if .IsPrivate}}
+            <span class="badge badge-private">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4a4 4 0 0 1 8 0v2h.25c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 12.25 15h-8.5A1.75 1.75 0 0 1 2 13.25v-5.5C2 6.784 2.784 6 3.75 6H4Zm8.25 3.5h-8.5a.25.25 0 0 0-.25.25v5.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25ZM10.5 6V4a2.5 2.5 0 0 0-5 0v2Z"/></svg>
+              Private
+            </span>
+            {{else}}
+            <span class="badge badge-public">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0Z"/></svg>
+              Public
+            </span>
+            {{end}}
+            <span>{{timeAgo .CreatedAt}}</span>
+          </div>
+        </div>
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">
+      <h3>No repositories yet</h3>
+      <p>Get started by creating your first repository.</p>
+      <a href="/new" class="btn btn-primary">Create repository</a>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

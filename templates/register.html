@@ -1,0 +1,38 @@
+{{template "layout" .}}
+{{define "title"}}Sign up — GitBox{{end}}
+{{define "content"}}
+<div class="auth-page">
+  <div class="auth-card">
+    <h1>Create your account</h1>
+    {{if .Error}}
+    <div class="alert alert-error">{{.Error}}</div>
+    {{end}}
+    <form method="POST" action="/register">
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input class="form-control" type="text" id="username" name="username" autocomplete="username"
+          value="{{if .Data}}{{index .Data "Username"}}{{end}}" autofocus required>
+        <div class="form-hint">3–39 characters. Letters, numbers, hyphens, underscores, dots.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="email">Email address</label>
+        <input class="form-control" type="email" id="email" name="email" autocomplete="email"
+          value="{{if .Data}}{{index .Data "Email"}}{{end}}" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-control" type="password" id="password" name="password" autocomplete="new-password" required>
+        <div class="form-hint">Minimum 8 characters.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="confirm">Confirm password</label>
+        <input class="form-control" type="password" id="confirm" name="confirm" autocomplete="new-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-full" style="justify-content:center; padding:8px">Create account</button>
+    </form>
+    <div class="auth-footer">
+      Already have an account? <a href="/login">Sign in</a>
+    </div>
+  </div>
+</div>
+{{end}}
