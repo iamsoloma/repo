@@ -1,47 +1,81 @@
-# Git HTTP Server
+# GitBox — Self-Hosted Git Server
 
-A Go-based HTTP git server that exposes git repositories over HTTP with optional authentication and git hook support.
-
-## Overview
-
-This project implements a smart HTTP git server in Go. It allows clients to clone, push, and pull git repositories over HTTP.
+A Go-based self-hosted git server with a full web UI. Users can register accounts, create public/private repositories, browse repos, and use git over HTTP.
 
 ## Architecture
 
 - **Language**: Go 1.21
-- **Entry point**: `main.go`
-- **Git package**: `git/` — contains the HTTP handler, SSH server, hook management, and auth logic
 - **Port**: 5000 (HTTP)
+- **Database**: SQLite via `modernc.org/sqlite` (pure Go, no CGo)
+- **Entry point**: `main.go`
+
+## Package Layout
+
+| Package | Purpose |
+|---------|---------|
+| `git/` | Smart HTTP git protocol handler (clone/push/pull) |
+| `db/` | SQLite database layer — users, repositories, sessions |
+| `handlers/` | HTTP handlers for web UI pages |
+| `templates/` | HTML templates (GitHub dark theme) |
+| `static/` | CSS stylesheet |
+| `repos/` | Bare git repositories on disk (`{owner}/{name}.git`) |
 
 ## Key Features
 
-- Smart HTTP git protocol support
-- Authentication via custom `AuthFunc` callback
-- Auto-create repositories on first push
-- Server-side git hooks (pre-receive, update, post-receive)
-- SSH support (`git/ssh.go`)
+- **User accounts**: register, login, logout, sessions via HTTP-only cookie
+- **Repositories**: create public/private repos; bare git repos initialized with `git init --bare`
+- **Web UI**: home, dashboard, new repo, user profile, repo view pages
+- **Git over HTTP**: smart HTTP protocol (clone, push, pull)
+- **Auth rules**:
+  - Public repos: unauthenticated clone allowed
+  - Private repos: only owner can clone/push
+  - Push: always requires credentials; only repo owner
 
-## Configuration (main.go)
+## Database Schema
 
-- `Dir`: `./repos` — where repositories are stored
-- `AutoCreate`: `true` — auto-creates repos on push
-- `AutoHooks`: `true` — installs hook scripts on setup
-- `Auth`: `true` — requires authentication
-- Auth is currently hardcoded to accept username `soloma` with any password
-
-## Development
-
-Run the server:
+```sql
+users        (id, username, email, password_hash, created_at)
+repositories (id, owner_id, name, description, is_private, created_at)
+sessions     (token, user_id, created_at)
 ```
-go run .
-```
+
+## URL Routes
+
+| Route | Description |
+|-------|-------------|
+| `GET /` | Home page (public repo listing) |
+| `GET/POST /register` | User registration |
+| `GET/POST /login` | Login |
+| `POST /logout` | Logout |
+| `GET /dashboard` | User's repository list |
+| `GET/POST /new` | Create new repository |
+| `GET /:user` | User profile |
+| `GET /:user/:repo` | Repository page with clone URL |
+| `GET /:user/:repo.git/info/refs` | Git smart HTTP (clone/fetch) |
+| `POST /:user/:repo.git/git-receive-pack` | Git push |
+| `POST /:user/:repo.git/git-upload-pack` | Git fetch |
+
+## Configuration
+
+- Git server: `Auth: false` (auth handled by middleware in `main.go`)
+- Repos stored at: `./repos/{owner}/{name}.git`
+- SQLite DB at: `./gitbox.db`
+- Templates at: `./templates/`
+- Static files at: `./static/`
 
 ## Dependencies
 
-- `github.com/gofrs/uuid` — UUID generation
-- `golang.org/x/crypto` — SSH support
+- `modernc.org/sqlite` — Pure-Go SQLite driver
+- `golang.org/x/crypto` — bcrypt password hashing
+- `github.com/gofrs/uuid` — UUID generation (git pkg)
 - `github.com/stretchr/testify` — testing
+
+## Development
+
+```bash
+go run .
+```
 
 ## Workflow
 
-- **Start application**: Runs `go run .` on port 5000
+- **Start application**: `go run .` on port 5000

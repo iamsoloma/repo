@@ -1,0 +1,72 @@
+{{template "layout" .}}
+{{define "title"}}New Repository — GitBox{{end}}
+{{define "content"}}
+<div class="container" style="max-width:640px">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Create a new repository</div>
+      <div class="page-subtitle">A repository contains all project files, including the revision history.</div>
+    </div>
+  </div>
+
+  {{if .Error}}
+  <div class="alert alert-error">{{.Error}}</div>
+  {{end}}
+
+  <div class="card">
+    <form method="POST" action="/new">
+      <div class="form-group">
+        <label class="form-label" for="name">
+          Repository name <span>*</span>
+        </label>
+        <input class="form-control" type="text" id="name" name="name"
+          value="{{if .Data}}{{index .Data "Name"}}{{end}}"
+          placeholder="my-project" autofocus required>
+        <div class="form-hint">Use letters, numbers, hyphens, underscores, or dots.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="description">
+          Description <span>(optional)</span>
+        </label>
+        <input class="form-control" type="text" id="description" name="description"
+          value="{{if .Data}}{{index .Data "Description"}}{{end}}"
+          placeholder="Short description of this repository">
+      </div>
+
+      <hr class="divider">
+
+      <div class="form-group">
+        <label class="form-label">Visibility</label>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="visibility" value="public"
+              {{if not (and .Data (index .Data "Private"))}}checked{{end}}>
+            <div>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--green)" style="margin-bottom:-3px"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0Z"/></svg>
+              <span class="radio-option-label">Public</span>
+              <span class="radio-option-desc">Anyone can see this repository. You choose who can commit.</span>
+            </div>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="visibility" value="private"
+              {{if and .Data (index .Data "Private")}}checked{{end}}>
+            <div>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--orange)" style="margin-bottom:-3px"><path d="M4 4a4 4 0 0 1 8 0v2h.25c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 12.25 15h-8.5A1.75 1.75 0 0 1 2 13.25v-5.5C2 6.784 2.784 6 3.75 6H4Zm8.25 3.5h-8.5a.25.25 0 0 0-.25.25v5.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25ZM10.5 6V4a2.5 2.5 0 0 0-5 0v2Z"/></svg>
+              <span class="radio-option-label">Private</span>
+              <span class="radio-option-desc">You choose who can see and commit to this repository.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div style="display:flex; justify-content:flex-end; gap:8px">
+        <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Create repository</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
