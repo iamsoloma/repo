@@ -1,6 +1,7 @@
 package handlers
 
 import (
+        "bytes"
         "fmt"
         "html/template"
         "log"
@@ -9,11 +10,158 @@ import (
         "os/exec"
         "path/filepath"
         "regexp"
+        "sort"
         "strings"
         "time"
 
         "repo/db"
 )
+
+// ─── Git tree types ──────────────────────────────────────────────────────────
+
+type CommitInfo struct {
+        Hash    string
+        Short   string
+        Message string
+        Date    time.Time
+}
+
+type TreeEntry struct {
+        Name   string
+        Path   string
+        IsDir  bool
+        Commit CommitInfo
+}
+
+type Breadcrumb struct {
+        Name string
+        URL  string
+}
+
+// ─── Git helpers ─────────────────────────────────────────────────────────────
+
+func repoDir(owner, name string) string {
+        return filepath.Join("repos", owner, name+".git")
+}
+
+func gitIsEmpty(dir string) bool {
+        return exec.Command("git", "-C", dir, "rev-parse", "HEAD").Run() != nil
+}
+
+func gitDefaultBranch(dir string) string {
+        out, err := exec.Command("git", "-C", dir, "symbolic-ref", "--short", "HEAD").Output()
+        if err != nil {
+                return "master"
+        }
+        return strings.TrimSpace(string(out))
+}
+
+func gitLastCommit(dir string) CommitInfo {
+        out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%H|%s|%aI").Output()
+        if err != nil {
+                return CommitInfo{}
+        }
+        return parseCommitLine(strings.TrimSpace(string(out)))
+}
+
+func gitFileLastCommit(dir, branch, path string) CommitInfo {
+        out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%H|%s|%aI", branch, "--", path).Output()
+        if err != nil {
+                return CommitInfo{}
+        }
+        return parseCommitLine(strings.TrimSpace(string(out)))
+}
+
+func parseCommitLine(s string) CommitInfo {
+        if s == "" {
+                return CommitInfo{}
+        }
+        parts := strings.SplitN(s, "|", 3)
+        if len(parts) < 3 {
+                return CommitInfo{}
+        }
+        h := strings.TrimSpace(parts[0])
+        short := h
+        if len(short) > 7 {
+                short = short[:7]
+        }
+        t, _ := time.Parse(time.RFC3339, strings.TrimSpace(parts[2]))
+        return CommitInfo{Hash: h, Short: short, Message: strings.TrimSpace(parts[1]), Date: t}
+}
+
+func gitListTree(dir, branch, subPath string) []TreeEntry {
+        treeRef := branch
+        if subPath != "" {
+                treeRef = branch + ":" + subPath
+        }
+        out, err := exec.Command("git", "-C", dir, "ls-tree", treeRef).Output()
+        if err != nil {
+                return nil
+        }
+        var entries []TreeEntry
+        for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+                if line == "" {
+                        continue
+                }
+                tab := strings.Index(line, "\t")
+                if tab < 0 {
+                        continue
+                }
+                name := line[tab+1:]
+                meta := strings.Fields(line[:tab])
+                if len(meta) < 2 {
+                        continue
+                }
+                isDir := meta[1] == "tree"
+                var fullPath string
+                if subPath == "" {
+                        fullPath = name
+                } else {
+                        fullPath = subPath + "/" + name
+                }
+                entries = append(entries, TreeEntry{
+                        Name:   name,
+                        Path:   fullPath,
+                        IsDir:  isDir,
+                        Commit: gitFileLastCommit(dir, branch, fullPath),
+                })
+        }
+        sort.Slice(entries, func(i, j int) bool {
+                if entries[i].IsDir != entries[j].IsDir {
+                        return entries[i].IsDir
+                }
+                return strings.ToLower(entries[i].Name) < strings.ToLower(entries[j].Name)
+        })
+        return entries
+}
+
+func gitFileContent(dir, branch, path string) (content string, isBinary bool, err error) {
+        out, err := exec.Command("git", "-C", dir, "show", branch+":"+path).Output()
+        if err != nil {
+                return "", false, err
+        }
+        if bytes.IndexByte(out, 0) >= 0 {
+                return "", true, nil
+        }
+        return string(out), false, nil
+}
+
+func buildBreadcrumbs(ownerName, repoName, subPath string) []Breadcrumb {
+        base := "/" + ownerName + "/" + repoName
+        if subPath == "" {
+                return []Breadcrumb{{Name: repoName, URL: ""}}
+        }
+        crumbs := []Breadcrumb{{Name: repoName, URL: base}}
+        parts := strings.Split(subPath, "/")
+        for i, part := range parts {
+                if i == len(parts)-1 {
+                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: ""})
+                } else {
+                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: base + "/tree/" + strings.Join(parts[:i+1], "/")})
+                }
+        }
+        return crumbs
+}
 
 var pageTemplates map[string]*template.Template
 
@@ -24,10 +172,11 @@ var reValidName = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 func Init(templatesDir string) error {
         funcMap := template.FuncMap{
                 "timeAgo": timeAgo,
+		"add1":    func(i int) int { return i + 1 },
         }
 
         pages := []string{
-                "home", "login", "register", "dashboard", "new_repo", "profile", "repo",
+                "home", "login", "register", "dashboard", "new_repo", "profile", "repo", "blob",
         }
 
         pageTemplates = make(map[string]*template.Template, len(pages))
@@ -372,7 +521,21 @@ func UserProfile(w http.ResponseWriter, r *http.Request, username string) {
 
 // ─── Repo View ─────────────────────────────────────────────────────────────
 
-func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName string) {
+type repoViewData struct {
+        Repo        *db.Repository
+        CloneURL    string
+        IsOwner     bool
+        Empty       bool
+        Branch      string
+        SubPath     string
+        ParentPath  string
+        Entries     []TreeEntry
+        LastCommit  CommitInfo
+        Breadcrumbs []Breadcrumb
+}
+
+
+func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName, subPath string) {
         viewer := CurrentUser(r)
 
         repo, err := db.GetRepository(ownerName, repoName)
@@ -388,21 +551,127 @@ func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName string
                 }
         }
 
-        host := r.Host
-        cloneURL := "http://" + host + "/" + ownerName + "/" + repoName + ".git"
-
-        type repoViewData struct {
-                Repo     *db.Repository
-                CloneURL string
-                IsOwner  bool
+        data := repoViewData{
+                Repo:     repo,
+                CloneURL: "http://" + r.Host + "/" + ownerName + "/" + repoName + ".git",
+                IsOwner:  viewer != nil && viewer.Username == ownerName,
         }
 
-        render(w, "repo.html", PageData{
+        dir := repoDir(ownerName, repoName)
+        if !gitIsEmpty(dir) {
+                branch := gitDefaultBranch(dir)
+                data.Empty = false
+                data.Branch = branch
+                data.SubPath = subPath
+                data.Entries = gitListTree(dir, branch, subPath)
+                data.LastCommit = gitLastCommit(dir)
+                if subPath != "" {
+                        idx := strings.LastIndex(subPath, "/")
+                        if idx < 0 {
+                                data.ParentPath = ""
+                        } else {
+                                data.ParentPath = "tree/" + subPath[:idx]
+                        }
+                }
+                data.Breadcrumbs = buildBreadcrumbs(ownerName, repoName, subPath)
+        } else {
+                data.Empty = true
+        }
+
+        render(w, "repo.html", PageData{User: viewer, Data: data})
+}
+
+// ─── Blob View ─────────────────────────────────────────────────────────────
+
+func BlobView(w http.ResponseWriter, r *http.Request, ownerName, repoName, filePath string) {
+        viewer := CurrentUser(r)
+
+        repo, err := db.GetRepository(ownerName, repoName)
+        if err != nil || repo == nil {
+                http.NotFound(w, r)
+                return
+        }
+
+        if repo.IsPrivate {
+                if viewer == nil || viewer.Username != ownerName {
+                        http.Error(w, "Repository not found", http.StatusNotFound)
+                        return
+                }
+        }
+
+        dir := repoDir(ownerName, repoName)
+        if gitIsEmpty(dir) {
+                http.NotFound(w, r)
+                return
+        }
+
+        branch := gitDefaultBranch(dir)
+        content, isBinary, err := gitFileContent(dir, branch, filePath)
+        if err != nil {
+                http.NotFound(w, r)
+                return
+        }
+
+        commit := gitFileLastCommit(dir, branch, filePath)
+        fileName := filepath.Base(filePath)
+
+        dirPart := filepath.Dir(filePath)
+        var parentPath string
+        if dirPart == "." || dirPart == "" {
+                parentPath = ""
+        } else {
+                parentPath = "tree/" + dirPart
+        }
+
+        var lines []string
+        if !isBinary {
+                lines = strings.Split(content, "\n")
+                if len(lines) > 0 && lines[len(lines)-1] == "" {
+                        lines = lines[:len(lines)-1]
+                }
+        }
+
+        type blobViewData struct {
+                Repo        *db.Repository
+                IsOwner     bool
+                Branch      string
+                FilePath    string
+                FileName    string
+                ParentPath  string
+                Content     string
+                Lines       []string
+                IsBinary    bool
+                LineCount   int
+                LastCommit  CommitInfo
+                Breadcrumbs []Breadcrumb
+        }
+
+        crumbs := []Breadcrumb{{Name: repoName, URL: "/" + ownerName + "/" + repoName}}
+        parts := strings.Split(filePath, "/")
+        base := "/" + ownerName + "/" + repoName
+        for i, part := range parts {
+                if i == len(parts)-1 {
+                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: ""})
+                } else {
+                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: base + "/tree/" + strings.Join(parts[:i+1], "/")})
+                }
+        }
+
+        render(w, "blob.html", PageData{
                 User: viewer,
-                Data: repoViewData{
-                        Repo:     repo,
-                        CloneURL: cloneURL,
-                        IsOwner:  viewer != nil && viewer.Username == ownerName,
+                Data: blobViewData{
+                        Repo:        repo,
+                        IsOwner:     viewer != nil && viewer.Username == ownerName,
+                        Branch:      branch,
+                        FilePath:    filePath,
+                        FileName:    fileName,
+                        ParentPath:  parentPath,
+                        Content:     content,
+                        Lines:       lines,
+                        IsBinary:    isBinary,
+                        LineCount:   len(lines),
+                        LastCommit:  commit,
+                        Breadcrumbs: crumbs,
                 },
         })
 }
