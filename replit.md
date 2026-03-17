@@ -50,7 +50,9 @@ sessions     (token, user_id, created_at)
 | `GET /dashboard` | User's repository list |
 | `GET/POST /new` | Create new repository |
 | `GET /:user` | User profile |
-| `GET /:user/:repo` | Repository page with clone URL |
+| `GET /:user/:repo` | Repository page — file tree (non-empty) or setup guide (empty) |
+| `GET /:user/:repo/tree/*path` | Subdirectory tree view |
+| `GET /:user/:repo/blob/*path` | File viewer with line numbers |
 | `GET /:user/:repo.git/info/refs` | Git smart HTTP (clone/fetch) |
 | `POST /:user/:repo.git/git-receive-pack` | Git push |
 | `POST /:user/:repo.git/git-upload-pack` | Git fetch |
