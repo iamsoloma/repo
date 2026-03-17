@@ -87,6 +87,20 @@ func gitLastCommit(dir, branch string) CommitInfo {
         return parseCommitLine(strings.TrimSpace(string(out)))
 }
 
+func gitListBranches(dir string) []string {
+        out, err := exec.Command("git", "-C", dir, "branch", "--format=%(refname:short)").Output()
+        if err != nil {
+                return nil
+        }
+        var branches []string
+        for _, b := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+                if b != "" {
+                        branches = append(branches, b)
+                }
+        }
+        return branches
+}
+
 func gitFileLastCommit(dir, branch, path string) CommitInfo {
         out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%H|%s|%aI", branch, "--", path).Output()
         if err != nil {
@@ -169,18 +183,19 @@ func gitFileContent(dir, branch, path string) (content string, isBinary bool, er
         return string(out), false, nil
 }
 
-func buildBreadcrumbs(ownerName, repoName, subPath string) []Breadcrumb {
+func buildBreadcrumbs(ownerName, repoName, ref, subPath string) []Breadcrumb {
         base := "/" + ownerName + "/" + repoName
+        refBase := base + "/tree/" + ref
         if subPath == "" {
                 return []Breadcrumb{{Name: repoName, URL: ""}}
         }
-        crumbs := []Breadcrumb{{Name: repoName, URL: base}}
+        crumbs := []Breadcrumb{{Name: repoName, URL: refBase}}
         parts := strings.Split(subPath, "/")
         for i, part := range parts {
                 if i == len(parts)-1 {
                         crumbs = append(crumbs, Breadcrumb{Name: part, URL: ""})
                 } else {
-                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: base + "/tree/" + strings.Join(parts[:i+1], "/")})
+                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: refBase + "/" + strings.Join(parts[:i+1], "/")})
                 }
         }
         return crumbs
@@ -552,7 +567,9 @@ type repoViewData struct {
         CloneURL    string
         IsOwner     bool
         Empty       bool
-        Branch      string
+        Ref         string
+        Branches    []string
+        IsDetached  bool
         SubPath     string
         ParentPath  string
         Entries     []TreeEntry
@@ -561,7 +578,7 @@ type repoViewData struct {
 }
 
 
-func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName, subPath string) {
+func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName, ref, subPath string) {
         viewer := CurrentUser(r)
 
         repo, err := db.GetRepository(ownerName, repoName)
@@ -585,21 +602,33 @@ func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName, subPa
 
         dir := repoDir(ownerName, repoName)
         if !gitIsEmpty(dir) {
-                branch := gitDefaultBranch(dir)
+                if ref == "" {
+                        ref = gitDefaultBranch(dir)
+                }
+                branches := gitListBranches(dir)
+                isDetached := true
+                for _, b := range branches {
+                        if b == ref {
+                                isDetached = false
+                                break
+                        }
+                }
                 data.Empty = false
-                data.Branch = branch
+                data.Ref = ref
+                data.Branches = branches
+                data.IsDetached = isDetached
                 data.SubPath = subPath
-                data.Entries = gitListTree(dir, branch, subPath)
-                data.LastCommit = gitLastCommit(dir, branch)
+                data.Entries = gitListTree(dir, ref, subPath)
+                data.LastCommit = gitLastCommit(dir, ref)
                 if subPath != "" {
                         idx := strings.LastIndex(subPath, "/")
                         if idx < 0 {
-                                data.ParentPath = ""
+                                data.ParentPath = "tree/" + ref
                         } else {
-                                data.ParentPath = "tree/" + subPath[:idx]
+                                data.ParentPath = "tree/" + ref + "/" + subPath[:idx]
                         }
                 }
-                data.Breadcrumbs = buildBreadcrumbs(ownerName, repoName, subPath)
+                data.Breadcrumbs = buildBreadcrumbs(ownerName, repoName, ref, subPath)
         } else {
                 data.Empty = true
         }
