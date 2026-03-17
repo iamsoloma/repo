@@ -45,19 +45,42 @@ func repoDir(owner, name string) string {
 }
 
 func gitIsEmpty(dir string) bool {
-        return exec.Command("git", "-C", dir, "rev-parse", "HEAD").Run() != nil
-}
-
-func gitDefaultBranch(dir string) string {
-        out, err := exec.Command("git", "-C", dir, "symbolic-ref", "--short", "HEAD").Output()
+        out, err := exec.Command("git", "-C", dir, "rev-list", "--all", "--count").Output()
         if err != nil {
-                return "master"
+                return true
         }
-        return strings.TrimSpace(string(out))
+        return strings.TrimSpace(string(out)) == "0"
 }
 
-func gitLastCommit(dir string) CommitInfo {
-        out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%H|%s|%aI").Output()
+// gitDefaultBranch returns the branch that has commits, preferring whatever
+// HEAD points to, then "main", then "master", then any branch it can find.
+func gitDefaultBranch(dir string) string {
+        // Try symbolic HEAD first — if that branch has commits, use it
+        if out, err := exec.Command("git", "-C", dir, "symbolic-ref", "--short", "HEAD").Output(); err == nil {
+                b := strings.TrimSpace(string(out))
+                if exec.Command("git", "-C", dir, "rev-parse", "--verify", b).Run() == nil {
+                        return b
+                }
+        }
+        // Try common default names
+        for _, b := range []string{"main", "master", "develop", "trunk"} {
+                if exec.Command("git", "-C", dir, "rev-parse", "--verify", b).Run() == nil {
+                        return b
+                }
+        }
+        // Last resort: list all branches and pick first
+        if out, err := exec.Command("git", "-C", dir, "branch", "--format=%(refname:short)").Output(); err == nil {
+                for _, b := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+                        if b != "" {
+                                return b
+                        }
+                }
+        }
+        return "master"
+}
+
+func gitLastCommit(dir, branch string) CommitInfo {
+        out, err := exec.Command("git", "-C", dir, "log", "-1", "--format=%H|%s|%aI", branch).Output()
         if err != nil {
                 return CommitInfo{}
         }
@@ -172,7 +195,7 @@ var reValidName = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 func Init(templatesDir string) error {
         funcMap := template.FuncMap{
                 "timeAgo": timeAgo,
-		"add1":    func(i int) int { return i + 1 },
+                "add1":    func(i int) int { return i + 1 },
         }
 
         pages := []string{
@@ -194,6 +217,9 @@ func Init(templatesDir string) error {
 }
 
 func timeAgo(t time.Time) string {
+        if t.IsZero() {
+                return ""
+        }
         d := time.Since(t)
         switch {
         case d < time.Minute:
@@ -564,7 +590,7 @@ func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName, subPa
                 data.Branch = branch
                 data.SubPath = subPath
                 data.Entries = gitListTree(dir, branch, subPath)
-                data.LastCommit = gitLastCommit(dir)
+                data.LastCommit = gitLastCommit(dir, branch)
                 if subPath != "" {
                         idx := strings.LastIndex(subPath, "/")
                         if idx < 0 {
