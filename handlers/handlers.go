@@ -638,7 +638,7 @@ func RepoView(w http.ResponseWriter, r *http.Request, ownerName, repoName, ref, 
 
 // ─── Blob View ─────────────────────────────────────────────────────────────
 
-func BlobView(w http.ResponseWriter, r *http.Request, ownerName, repoName, filePath string) {
+func BlobView(w http.ResponseWriter, r *http.Request, ownerName, repoName, ref, filePath string) {
         viewer := CurrentUser(r)
 
         repo, err := db.GetRepository(ownerName, repoName)
@@ -660,22 +660,33 @@ func BlobView(w http.ResponseWriter, r *http.Request, ownerName, repoName, fileP
                 return
         }
 
-        branch := gitDefaultBranch(dir)
-        content, isBinary, err := gitFileContent(dir, branch, filePath)
+        if ref == "" {
+                ref = gitDefaultBranch(dir)
+        }
+        branches := gitListBranches(dir)
+        isDetached := true
+        for _, b := range branches {
+                if b == ref {
+                        isDetached = false
+                        break
+                }
+        }
+
+        content, isBinary, err := gitFileContent(dir, ref, filePath)
         if err != nil {
                 http.NotFound(w, r)
                 return
         }
 
-        commit := gitFileLastCommit(dir, branch, filePath)
+        commit := gitFileLastCommit(dir, ref, filePath)
         fileName := filepath.Base(filePath)
 
         dirPart := filepath.Dir(filePath)
         var parentPath string
         if dirPart == "." || dirPart == "" {
-                parentPath = ""
+                parentPath = "tree/" + ref
         } else {
-                parentPath = "tree/" + dirPart
+                parentPath = "tree/" + ref + "/" + dirPart
         }
 
         var lines []string
@@ -689,7 +700,9 @@ func BlobView(w http.ResponseWriter, r *http.Request, ownerName, repoName, fileP
         type blobViewData struct {
                 Repo        *db.Repository
                 IsOwner     bool
-                Branch      string
+                Ref         string
+                Branches    []string
+                IsDetached  bool
                 FilePath    string
                 FileName    string
                 ParentPath  string
@@ -701,14 +714,15 @@ func BlobView(w http.ResponseWriter, r *http.Request, ownerName, repoName, fileP
                 Breadcrumbs []Breadcrumb
         }
 
-        crumbs := []Breadcrumb{{Name: repoName, URL: "/" + ownerName + "/" + repoName}}
-        parts := strings.Split(filePath, "/")
         base := "/" + ownerName + "/" + repoName
-        for i, part := range parts {
-                if i == len(parts)-1 {
+        refBase := base + "/tree/" + ref
+        crumbs := []Breadcrumb{{Name: repoName, URL: base}}
+        fparts := strings.Split(filePath, "/")
+        for i, part := range fparts {
+                if i == len(fparts)-1 {
                         crumbs = append(crumbs, Breadcrumb{Name: part, URL: ""})
                 } else {
-                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: base + "/tree/" + strings.Join(parts[:i+1], "/")})
+                        crumbs = append(crumbs, Breadcrumb{Name: part, URL: refBase + "/" + strings.Join(fparts[:i+1], "/")})
                 }
         }
 
@@ -717,7 +731,9 @@ func BlobView(w http.ResponseWriter, r *http.Request, ownerName, repoName, fileP
                 Data: blobViewData{
                         Repo:        repo,
                         IsOwner:     viewer != nil && viewer.Username == ownerName,
-                        Branch:      branch,
+                        Ref:         ref,
+                        Branches:    branches,
+                        IsDetached:  isDetached,
                         FilePath:    filePath,
                         FileName:    fileName,
                         ParentPath:  parentPath,

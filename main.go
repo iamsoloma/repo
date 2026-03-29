@@ -177,15 +177,29 @@ func routeDynamic(w http.ResponseWriter, r *http.Request) {
                         http.NotFound(w, r)
                 }
         case 2:
-                handlers.RepoView(w, r, parts[0], strings.TrimSuffix(parts[1], ".git"), "")
+                handlers.RepoView(w, r, parts[0], strings.TrimSuffix(parts[1], ".git"), "", "")
         case 3:
                 owner := parts[0]
                 repo := strings.TrimSuffix(parts[1], ".git")
                 rest := parts[2]
                 if strings.HasPrefix(rest, "blob/") {
-                        handlers.BlobView(w, r, owner, repo, strings.TrimPrefix(rest, "blob/"))
+                        // blob/<ref>/<filepath>
+                        refAndPath := strings.TrimPrefix(rest, "blob/")
+                        idx := strings.Index(refAndPath, "/")
+                        if idx < 0 {
+                                http.NotFound(w, r)
+                                return
+                        }
+                        handlers.BlobView(w, r, owner, repo, refAndPath[:idx], refAndPath[idx+1:])
                 } else if strings.HasPrefix(rest, "tree/") {
-                        handlers.RepoView(w, r, owner, repo, strings.TrimPrefix(rest, "tree/"))
+                        // tree/<ref> or tree/<ref>/<subpath>
+                        refAndPath := strings.TrimPrefix(rest, "tree/")
+                        idx := strings.Index(refAndPath, "/")
+                        if idx < 0 {
+                                handlers.RepoView(w, r, owner, repo, refAndPath, "")
+                        } else {
+                                handlers.RepoView(w, r, owner, repo, refAndPath[:idx], refAndPath[idx+1:])
+                        }
                 } else {
                         http.NotFound(w, r)
                 }
