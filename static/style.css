@@ -435,3 +435,96 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   white-space: pre;
   tab-size: 4;
 }
+
+/* ── Ref / branch selector ───────────────────────────────────── */
+.ref-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ref-selector {
+  position: relative;
+}
+.ref-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+}
+.ref-btn:hover { background: var(--hover); border-color: var(--text-muted); }
+.ref-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.ref-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  width: 280px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+.ref-menu.open { display: block; }
+.ref-menu-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.ref-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.ref-search-input:focus { border-color: var(--accent); }
+.ref-menu-section-title {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+#ref-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.ref-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ref-menu-item:hover { background: var(--hover); }
+.ref-menu-item.active { font-weight: 600; color: var(--accent); }
+
+/* clickable commit hash */
+.commit-hash-link { text-decoration: none; }
+.commit-hash-link:hover .commit-hash { color: var(--accent); text-decoration: underline; }

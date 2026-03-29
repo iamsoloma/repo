@@ -19,6 +19,44 @@
     </div>
   </div>
 
+  {{/* ── Ref / branch selector bar ── */}}
+  <div class="ref-bar">
+    <div class="ref-selector" id="ref-selector">
+      <button class="ref-btn" id="ref-btn" onclick="toggleRefMenu(event)">
+        {{if .IsDetached}}
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></svg>
+        {{else}}
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>
+        {{end}}
+        <span class="ref-label">{{.Ref}}</span>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="margin-left:2px"><path d="M4.427 7.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
+      </button>
+      <div class="ref-menu" id="ref-menu">
+        <div class="ref-menu-search">
+          <input type="text" id="ref-search" class="ref-search-input"
+                 placeholder="Find branch or commit…"
+                 oninput="filterRefs(this.value)"
+                 onkeydown="handleRefKey(event)"
+                 autocomplete="off">
+        </div>
+        <div class="ref-menu-section-title">Branches</div>
+        <div id="ref-list">
+          {{$owner := .Repo.OwnerName}}{{$repo := .Repo.Name}}{{$file := .FilePath}}{{$cur := .Ref}}
+          {{range .Branches}}
+          <a href="/{{$owner}}/{{$repo}}/blob/{{.}}/{{$file}}"
+             class="ref-menu-item{{if eq . $cur}} active{{end}}" data-ref="{{.}}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"
+                 style="visibility:{{if eq . $cur}}visible{{else}}hidden{{end}}">
+              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/>
+            </svg>
+            {{.}}
+          </a>
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+
   {{/* ── File commit info bar ── */}}
   <div class="commit-bar" style="margin-bottom:0; border-bottom:none; border-radius:var(--radius) var(--radius) 0 0">
     <div class="commit-bar-left">
@@ -26,7 +64,9 @@
       <span class="commit-msg">{{.LastCommit.Message}}</span>
     </div>
     <div class="commit-bar-right">
-      <code class="commit-hash">{{.LastCommit.Short}}</code>
+      <a href="/{{.Repo.OwnerName}}/{{.Repo.Name}}/tree/{{.LastCommit.Hash}}" class="commit-hash-link">
+        <code class="commit-hash">{{.LastCommit.Short}}</code>
+      </a>
       <span class="commit-date">{{timeAgo .LastCommit.Date}}</span>
     </div>
   </div>
@@ -65,4 +105,49 @@
 
   {{end}}{{/* end with .Data */}}
 </div>
+
+<script>
+var _owner = "{{with .Data}}{{.Repo.OwnerName}}{{end}}";
+var _repo  = "{{with .Data}}{{.Repo.Name}}{{end}}";
+var _file  = "{{with .Data}}{{.FilePath}}{{end}}";
+
+function toggleRefMenu(e) {
+  e.stopPropagation();
+  var menu = document.getElementById('ref-menu');
+  var open = menu.classList.toggle('open');
+  if (open) {
+    var inp = document.getElementById('ref-search');
+    inp.value = '';
+    filterRefs('');
+    setTimeout(function(){ inp.focus(); }, 10);
+  }
+}
+
+function filterRefs(q) {
+  q = q.toLowerCase();
+  var items = document.querySelectorAll('#ref-list .ref-menu-item');
+  items.forEach(function(el) {
+    el.style.display = el.dataset.ref.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+  });
+}
+
+function handleRefKey(e) {
+  if (e.key === 'Enter') {
+    var val = e.target.value.trim();
+    if (val) {
+      window.location.href = '/' + _owner + '/' + _repo + '/blob/' + val + '/' + _file;
+    }
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('ref-menu').classList.remove('open');
+  }
+}
+
+document.addEventListener('click', function(e) {
+  var sel = document.getElementById('ref-selector');
+  if (sel && !sel.contains(e.target)) {
+    document.getElementById('ref-menu').classList.remove('open');
+  }
+});
+</script>
 {{end}}
