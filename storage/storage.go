@@ -2,20 +2,34 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type Config struct {
-	ConnectionString string
+	User     string
+	Password string
+	Domain   string
+	Port     string
+	DBName   string
 }
 
 type Database struct {
 	conn *pgx.Conn
 }
 
+func GetConnectionString(config Config) string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+		config.User,
+		config.Password,
+		config.Domain,
+		config.Port,
+		config.DBName)
+}
+
 func NewPostgresConnection(config Config) (*Database, error) {
-	conn, err := pgx.Connect(context.Background(), config.ConnectionString)
+	conn, err := pgx.Connect(context.Background(), GetConnectionString(config))
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +52,9 @@ func (db *Database) GetPostgresVersion() (string, error) {
 // Migrate call migration`s functions for all entities
 func (db *Database) Migrate() error {
 	if err := db.migrateUsers(); err != nil {
+		return err
+	}
+	if err := db.migrateRepositories(); err != nil {
 		return err
 	}
 	return nil

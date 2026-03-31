@@ -1,13 +1,16 @@
 package storage
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type User struct {
 	ID           int64
 	Username     string
 	Email        string
 	PasswordHash string
-	CreatedAt    string
+	CreatedAt    time.Time
 }
 
 func (db *Database) migrateUsers() error {
