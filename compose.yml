@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: "repo"
+      POSTGRES_USER: "main"
+      POSTGRES_PASSWORD: "qwerty"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+
+  drizzle:
+    image: ghcr.io/drizzle-team/gateway:1.2.0
+    environment:
+      PORT: "4983"
+      STORE_PATH: "/app"
+      MASTERPASS: "qwerty"
+    ports:
+      - "4983:4983"
+    volumes:
+      - drizzle-data:/app
+
+volumes:
+  pgdata:
+  drizzle-data:
