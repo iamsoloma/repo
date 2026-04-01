@@ -1,8 +1,11 @@
 package server
 
 import (
+	"log"
+	"net/http"
 	"time"
 
+	"repo/git"
 	"repo/storage"
 )
 
@@ -33,4 +36,39 @@ func NewServer(config Config) (*Server, error) {
 		Config: config,
 		DB:     db,
 	}, nil
+}
+
+func (s *Server) Start() error {
+	s.StartedAt = time.Now()
+
+	hooks := &git.HookScripts{
+		PreReceive:  `echo "Hello From Repo!"`,
+		PostReceive: `echo "Hello World!" > file.txt`,
+	}
+
+	gitService := git.New(git.Config{
+		Dir:        "./repos",
+		AutoCreate: false,
+		AutoHooks:  true,
+		Hooks:      hooks,
+		Auth:       true,
+	})
+
+	gitService.AuthFunc = func(c git.Credential, r *git.Request) (bool, error) {
+		log.Println("Auth: ", c.Username, c.Password, r.RepoName)
+		_, err := s.DB.GetUserByUsername(c.Username)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	if err := gitService.Setup(); err != nil {
+		return err
+	}
+
+	http.Handle("/", gitService)
+
+	log.Printf("Server started at %s", s.Config.ListenAddr)
+	return http.ListenAndServe(s.Config.ListenAddr, nil)
 }
