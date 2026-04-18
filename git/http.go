@@ -115,12 +115,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	/*if !repoExists(req.RepoPath) && s.config.AutoCreate == true {
+	if !repoExists(req.RepoPath) && s.config.AutoCreate == true {
 		err := initRepo(req.RepoName, &s.config)
 		if err != nil {
 			logError("repo-init", err)
 		}
-	}*/
+	}
 
 	if !repoExists(req.RepoPath) {
 		logError("repo-init", fmt.Errorf("%s does not exist", req.RepoPath))

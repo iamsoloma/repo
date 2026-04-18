@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"log"
 	"net/http"
 	"time"
@@ -48,7 +50,7 @@ func (s *Server) Start() error {
 
 	gitService := git.New(git.Config{
 		Dir:        "./repos",
-		AutoCreate: false,
+		AutoCreate: true,
 		AutoHooks:  true,
 		Hooks:      hooks,
 		Auth:       true,
@@ -56,9 +58,14 @@ func (s *Server) Start() error {
 
 	gitService.AuthFunc = func(c git.Credential, r *git.Request) (bool, error) {
 		log.Println("Auth: ", c.Username, c.Password, r.RepoName)
-		_, err := s.DB.GetUserByUsername(c.Username)
+		u, err := s.DB.GetUserByUsername(c.Username)
 		if err != nil {
 			return false, err
+		}
+		h := sha256.New()
+		h.Write([]byte(c.Password))
+		if u.PasswordHash != base64.StdEncoding.EncodeToString((h.Sum(nil))) {
+			return false, nil
 		}
 		return true, nil
 	}
