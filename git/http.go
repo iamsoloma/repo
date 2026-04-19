@@ -232,7 +232,7 @@ func initRepo(name string, config *Config) error {
 	}
 
 	if config.AutoHooks && config.Hooks != nil {
-		return config.Hooks.setupInDir(fullPath)
+		return config.Hooks.setupInRepo(fullPath)
 	}
 
 	return nil

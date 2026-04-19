@@ -25,7 +25,7 @@ type HookScripts struct {
 }
 
 // Configure hook scripts in the repo base directory
-func (c *HookScripts) setupInDir(path string) error {
+func (c *HookScripts) setupInRepo(path string) error {
 	basePath := filepath.Join(path, "hooks")
 	scripts := map[string]string{
 		"pre-receive":  c.PreReceive,
@@ -86,14 +86,22 @@ func (c *Config) setupHooks() error {
 	}
 
 	for _, file := range files {
-		if !file.IsDir() {
-			continue
-		}
+		if file.IsDir() {
+			// List all directories with users repositories
+			userSpace := filepath.Join(c.Dir, file.Name())
+			userRepos, err := ioutil.ReadDir(userSpace)
+			if err != nil {
+				return err
+			}
 
-		path := filepath.Join(c.Dir, file.Name())
-
-		if err := c.Hooks.setupInDir(path); err != nil {
-			return err
+			for _, repo := range userRepos {
+				if repo.IsDir() {
+					repoPath := filepath.Join(userSpace, repo.Name())
+					if err := c.Hooks.setupInRepo(repoPath); err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 
