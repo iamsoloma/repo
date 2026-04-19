@@ -74,6 +74,8 @@ func (s *Server) Start() error {
 		return err
 	}
 
+	http.HandleFunc("POST /user", s.CreateUser)
+	http.HandleFunc("GET /user", s.GetUser)
 	http.Handle("/", gitService)
 
 	log.Printf("Server started at %s", s.Config.ListenAddr)

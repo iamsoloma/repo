@@ -1,0 +1,20 @@
+meta {
+  name: CreateUser
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:3000/user
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "Username": "ivan",
+    "Email": "ivanivanov@mail.ru",
+    "PasswordHash": "588+9PF8OZmpTyxvYS6KiI5bECaHjk4ZOYsjvTjsIho=",
+    "CreatedAt": "2006-01-02T15:04:05Z07:00"
+  }
+}
