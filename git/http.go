@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"os/exec"
 	"path"
 	"strings"
-	"syscall"
 )
 
 type service struct {
@@ -115,14 +112,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if !repoExists(req.RepoPath) && s.config.AutoCreate == true {
-		err := initRepo(req.RepoName, &s.config)
+	if !RepoExists(req.RepoPath) && s.config.AutoCreate == true {
+		err := InitRepo(req.RepoName, &s.config)
 		if err != nil {
 			logError("repo-init", err)
 		}
 	}
 
-	if !repoExists(req.RepoPath) {
+	if !RepoExists(req.RepoPath) {
 		logError("repo-init", fmt.Errorf("%s does not exist", req.RepoPath))
 		http.NotFound(w, r)
 		return
@@ -140,7 +137,7 @@ func (s *Server) getInfoRefs(_ string, w http.ResponseWriter, r *Request) {
 		return
 	}
 
-	cmd, pipe := gitCommand(s.config.GitPath, subCommand(rpc), "--stateless-rpc", "--advertise-refs", r.RepoPath)
+	cmd, pipe := ExecGitCommand(s.config.GitPath, subCommand(rpc), "--stateless-rpc", "--advertise-refs", r.RepoPath)
 	if err := cmd.Start(); err != nil {
 		fail500(w, context, err)
 		return
@@ -185,7 +182,7 @@ func (s *Server) postRPC(rpc string, w http.ResponseWriter, r *Request) {
 		}
 	}
 
-	cmd, pipe := gitCommand(s.config.GitPath, subCommand(rpc), "--stateless-rpc", r.RepoPath)
+	cmd, pipe := ExecGitCommand(s.config.GitPath, subCommand(rpc), "--stateless-rpc", r.RepoPath)
 	defer pipe.Close()
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -222,34 +219,4 @@ func (s *Server) postRPC(rpc string, w http.ResponseWriter, r *Request) {
 
 func (s *Server) Setup() error {
 	return s.config.Setup()
-}
-
-func initRepo(name string, config *Config) error {
-	fullPath := path.Join(config.Dir, name)
-
-	if err := exec.Command(config.GitPath, "init", "--bare", fullPath).Run(); err != nil {
-		return err
-	}
-
-	if config.AutoHooks && config.Hooks != nil {
-		return config.Hooks.setupInRepo(fullPath)
-	}
-
-	return nil
-}
-
-func repoExists(p string) bool {
-	_, err := os.Stat(path.Join(p, "objects"))
-	return err == nil
-}
-
-func gitCommand(name string, args ...string) (*exec.Cmd, io.ReadCloser) {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Env = os.Environ()
-
-	r, _ := cmd.StdoutPipe()
-	cmd.Stderr = cmd.Stdout
-
-	return cmd, r
 }
