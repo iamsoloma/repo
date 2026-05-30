@@ -1,0 +1,25 @@
+kind: pipeline
+spec:
+  stages:
+  - name: build
+    spec:
+      platform:
+        arch: amd64
+        os: linux
+      steps:
+      - name: go_install
+        spec:
+          container:
+            image: golang:1
+          script:
+          - go build
+        type: run
+      - name: go_test
+        spec:
+          container:
+            image: golang:1
+          script:
+          - go test -v ./...
+        type: run
+    type: ci
+version: 1
