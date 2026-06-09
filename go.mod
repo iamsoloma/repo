@@ -1,6 +1,6 @@
 module repo
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/go-git/go-billy/v6 v6.0.0-alpha.1
